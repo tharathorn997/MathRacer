@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Math Racer M.2 (iPad Ready)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;800&display=swap');
+
+        * {
+            box-sizing: border-box;
+            /* ป้องกันการกดค้างแล้วขึ้นเมนูบน iOS */
+            -webkit-touch-callout: none; 
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #0d0d0d;
+            font-family: 'Kanit', sans-serif;
+            /* ป้องกันการเลื่อน/ซูมทั้งหน้า */
+            touch-action: none; 
+            position: fixed; /* ล็อกหน้าจอไม่ให้เด้ง */
+            width: 100%;
+            height: 100%;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle, #1a1a2e 0%, #000000 100%);
+            overflow: hidden;
+        }
+
+        /* Touch Zones สำหรับ iPad/Tablet */
+        .touch-zone {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 50%;
+            z-index: 20; /* อยู่บนสุดเพื่อให้กดติดง่าย */
+            /* background: rgba(255,0,0,0.1); เปิดบรรทัดนี้ถ้าอยากเห็นโซนกด */
+        }
+        #left-zone { left: 0; }
+        #right-zone { right: 0; }
+
+        /* HUD */
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #fff;
+            z-index: 15;
+            pointer-events: none;
+        }
+        #score { font-size: 24px; font-weight: bold; color: #00ffcc; }
+        #lives { font-size: 24px; margin-top: 5px; }
+
+        /* Question Box */
+        #question-display {
+            position: absolute;
+            top: 12%; /* ขยับลงมาหน่อยเผื่อติดขอบ iPad */
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            border: 3px solid #00ffcc;
+            padding: 20px 50px;
+            border-radius: 60px;
+            color: white;
+            font-size: 40px; /* ใหญ่ขึ้นให้อ่านง่ายบนจอใหญ่ */
+            font-weight: 800;
+            z-index: 10;
+            text-shadow: 0 0 15px #00ffcc;
+            white-space: nowrap;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.5);
+        }
+
+        /* Game Elements */
+        .lane-marker {
+            position: absolute;
+            width: 4px;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.15);
+            top: 0;
+        }
+        
+        .car {
+            position: absolute;
+            bottom: 120px; /* ขยับขึ้นมาหน่อย */
+            width: 70px; /* ใหญ่ขึ้นนิดนึง */
+            height: 110px;
+            background: linear-gradient(to bottom, #ff3333, #990000);
+            border-radius: 15px 15px 5px 5px;
+            box-shadow: 0 0 25px rgba(255, 51, 51, 0.7);
+            z-index: 5;
+            transition: left 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* เคลื่อนไหวนุ่มขึ้น */
+        }
+        .car::after {
+            content: '';
+            position: absolute;
+            bottom: 5px;
+            width: 100%;
+            height: 10px;
+            background: #ffaa00;
+            box-shadow: 0 0 10px #ffaa00;
+        }
+
+        /* Item Style */
+        .item {
+            position: absolute;
+            width: 90px; /* ใหญ่ขึ้นสำหรับ iPad */
+            height: 90px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-weight: bold;
+            color: white;
+            z-index: 4;
+            box-shadow: 0 0 20px rgba(255,255,255,0.3);
+            background: rgba(52, 152, 219, 0.95);
+            border: 4px solid #2980b9;
+        }
+
+        /* Screens */
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.92);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 30; /* สูงสุด */
+            color: white;
+            text-align: center;
+        }
+        button {
+            background: #00ffcc;
+            border: none;
+            padding: 20px 60px;
+            font-size: 30px;
+            font-family: 'Kanit', sans-serif;
+            font-weight: bold;
+            border-radius: 40px;
+            cursor: pointer;
+            margin-top: 30px;
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.4);
+            transition: transform 0.2s;
+            /* ทำให้ปุ่มกดง่ายบน iPad */
+            min-width: 200px; 
+            touch-action: manipulation;
+        }
+        button:active { transform: scale(0.95); background: #00ccaa; }
+        
+        .controls-hint {
+            margin-top: 30px;
+            color: #aaa;
+            font-size: 18px;
+        }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="left-zone" class="touch-zone"></div>
+        <div id="right-zone" class="touch-zone"></div>
+
+        <div class="lane-marker" style="left: 33%;"></div>
+        <div class="lane-marker" style="left: 66%;"></div>
+        <div id="player-car" class="car" style="left: calc(50% - 35px);"></div>
+
+        <div id="question-display">พร้อมไหม?</div>
+        <div id="hud">
+            <div id="score">SCORE: 0</div>
+            <div id="lives">❤️❤️❤️</div>
+        </div>
+
+        <div id="start-screen">
+            <h1 style="font-size: 60px; color: #00ffcc; margin:0; text-shadow: 0 0 20px #00ffcc;">MATH RACER</h1>
+            <h2 style="color: #ff3366; font-size: 30px;">iPad Edition</h2>
+            <p style="font-size: 20px;">แตะฝั่งซ้าย/ขวา เพื่อเปลี่ยนเลน</p>
+            <button onclick="startGame()">START</button>
+        </div>
+
+        <div id="game-over-screen" class="hidden">
+            <h1 style="color: #ff3333; font-size: 50px;">GAME OVER</h1>
+            <p style="font-size: 30px;">คะแนนรวม: <span id="final-score">0</span></p>
+            <button onclick="resetGame()">เล่นใหม่</button>
+        </div>
+    </div>
+
+    <script>
+        const lanes = [16.66, 50, 83.33];
+        let currentLane = 1;
+        let gameSpeed = 2;
+        let isPlaying = false;
+        let score = 0;
+        let lives = 3;
+        let items = [];
+        let animationId;
+
+        // --- คลังข้อสอบ 50 ข้อ ---
+        const questions = [
+            { q: "(-2) + 5", ans: "3", wrong: ["-3", "-7"] },
+            { q: "10 - (-2)", ans: "12", wrong: ["8", "-8"] },
+            { q: "(-5) + (-3)", ans: "-8", wrong: ["-2", "8"] },
+            { q: "(-8) - 2", ans: "-10", wrong: ["-6", "6"] },
+            { q: "0 - 5", ans: "-5", wrong: ["5", "0"] },
+            { q: "(-1) + 1", ans: "0", wrong: ["-2", "2"] },
+            { q: "(-3) × (-4)", ans: "12", wrong: ["-12", "7"] },
+            { q: "(-5) × 2", ans: "-10", wrong: ["10", "-7"] },
+            { q: "(-20) ÷ 5", ans: "-4", wrong: ["4", "5"] },
+            { q: "(-8) ÷ (-2)", ans: "4", wrong: ["-4", "-6"] },
+            { q: "(-1) × 9", ans: "-9", wrong: ["9", "10"] },
+            { q: "2³", ans: "8", wrong: ["6", "9"] },
+            { q: "3²", ans: "9", wrong: ["6", "27"] },
+            { q: "(-2)²", ans: "4", wrong: ["-4", "2"] },
+            { q: "(-2)³", ans: "-8", wrong: ["8", "6"] },
+            { q: "5⁰", ans: "1", wrong: ["0", "5"] },
+            { q: "10²", ans: "100", wrong: ["20", "1000"] },
+            { q: "1¹⁰", ans: "1", wrong: ["10", "0"] },
+            { q: "√49", ans: "7", wrong: ["49", "14"] },
+            { q: "√100", ans: "10", wrong: ["50", "20"] },
+            { q: "√64", ans: "8", wrong: ["32", "4"] },
+            { q: "√25", ans: "5", wrong: ["2.5", "10"] },
+            { q: "√1", ans: "1", wrong: ["0", "0.5"] },
+            { q: "√0", ans: "0", wrong: ["1", "10"] },
+            { q: "x + 2 = 10", ans: "8", wrong: ["12", "5"] },
+            { q: "x - 5 = 3", ans: "8", wrong: ["-2", "2"] },
+            { q: "2x = 10", ans: "5", wrong: ["20", "8"] },
+            { q: "3x = 12", ans: "4", wrong: ["36", "9"] },
+            { q: "x ÷ 2 = 5", ans: "10", wrong: ["2.5", "7"] },
+            { q: "2x + 1 = 5", ans: "2", wrong: ["3", "4"] },
+            { q: "5x = 0", ans: "0", wrong: ["5", "1"] },
+            { q: "2x + 3x", ans: "5x", wrong: ["6x", "5x²"] },
+            { q: "5a - 2a", ans: "3a", wrong: ["3", "7a"] },
+            { q: "x + x", ans: "2x", wrong: ["x²", "1"] },
+            { q: "4y - 4y", ans: "0", wrong: ["y", "4"] },
+            { q: "3x × 2", ans: "6x", wrong: ["5x", "6"] },
+            { q: "x × x", ans: "x²", wrong: ["2x", "x"] },
+            { q: "3, 4, ?", ans: "5", wrong: ["7", "6"] },
+            { q: "6, 8, ?", ans: "10", wrong: ["14", "48"] },
+            { q: "5, 12, ?", ans: "13", wrong: ["17", "7"] },
+            { q: "c²=a²+?", ans: "b²", wrong: ["b", "2b"] },
+            { q: "มุมภายใน ∆", ans: "180", wrong: ["360", "90"] },
+            { q: "มุมฉากมีกี่องศา", ans: "90", wrong: ["180", "45"] },
+            { q: "π มีค่าประมาณ", ans: "3.14", wrong: ["3.41", "4.13"] },
+            { q: "ลูกเต๋ามีเลขคู่", ans: "3ตัว", wrong: ["2ตัว", "4ตัว"] },
+            { q: "จำนวนเฉพาะ < 10", ans: "4ตัว", wrong: ["3ตัว", "5ตัว"] }
+        ];
+
+        let currentQ = null;
+
+        // --- Controls Logic (iPad Optimized) ---
+        // ใช้ touchstart + preventDefault เพื่อกันการซูมและหน่วง
+        const leftZone = document.getElementById('left-zone');
+        const rightZone = document.getElementById('right-zone');
+
+        leftZone.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // กันซูม/Scroll
+            if (isPlaying && currentLane > 0) moveCar(-1);
+        }, { passive: false });
+
+        rightZone.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // กันซูม/Scroll
+            if (isPlaying && currentLane < 2) moveCar(1);
+        }, { passive: false });
+
+        // Keyboard ยังใช้ได้เหมือนเดิม
+        document.addEventListener('keydown', (e) => {
+            if (!isPlaying) return;
+            if (e.key === 'ArrowLeft' && currentLane > 0) moveCar(-1);
+            if (e.key === 'ArrowRight' && currentLane < 2) moveCar(1);
+        });
+
+        function moveCar(direction) {
+            currentLane += direction;
+            const car = document.getElementById('player-car');
+            car.style.left = `calc(${lanes[currentLane]}% - 35px)`; // ปรับ offset ตามขนาดรถใหม่
+        }
+
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            isPlaying = true;
+            score = 0;
+            lives = 3;
+            gameSpeed = 2;
+            items = [];
+            updateHUD();
+            nextQuestion();
+            gameLoop();
+        }
+
+        function nextQuestion() {
+            if (!isPlaying) return;
+            
+            let newQ;
+            do {
+                newQ = questions[Math.floor(Math.random() * questions.length)];
+            } while (newQ === currentQ && questions.length > 1);
+            
+            currentQ = newQ;
+            document.getElementById('question-display').innerText = currentQ.q;
+
+            let laneAnswers = [null, null, null];
+            let correctLane = Math.floor(Math.random() * 3);
+            
+            laneAnswers[correctLane] = { text: currentQ.ans, type: 'correct' };
+            
+            let wrongIndex = 0;
+            let shuffledWrong = [...currentQ.wrong].sort(() => Math.random() - 0.5);
+
+            for (let i = 0; i < 3; i++) {
+                if (i !== correctLane) {
+                    laneAnswers[i] = { text: shuffledWrong[wrongIndex], type: 'wrong' };
+                    wrongIndex++;
+                    if (wrongIndex >= shuffledWrong.length) wrongIndex = 0;
+                }
+            }
+            spawnItems(laneAnswers);
+        }
+
+        function spawnItems(laneAnswers) {
+            laneAnswers.forEach((ans, index) => {
+                if (ans) {
+                    const el = document.createElement('div');
+                    el.className = `item`; 
+                    el.innerText = ans.text;
+                    el.style.left = `calc(${lanes[index]}% - 45px)`; // ปรับ offset
+                    el.style.top = '-100px';
+                    document.getElementById('game-container').appendChild(el);
+                    
+                    items.push({
+                        element: el,
+                        y: -100,
+                        type: ans.type,
+                        lane: index
+                    });
+                }
+            });
+        }
+
+        function gameLoop() {
+            if (!isPlaying) return;
+
+            items.forEach((item, index) => {
+                item.y += gameSpeed;
+                item.element.style.top = `${item.y}px`;
+
+                const screenH = window.innerHeight;
+                const carY = screenH - 180; // จุดชนปรับให้สูงขึ้นนิดนึง
+
+                if (item.y > carY && item.y < carY + 90 && item.lane === currentLane) {
+                    handleCollision(index);
+                }
+
+                if (item.y > screenH) {
+                    item.element.remove();
+                    items.splice(index, 1);
+                    if (items.length === 0) {
+                        setTimeout(nextQuestion, 500);
+                    }
+                }
+            });
+
+            gameSpeed += 0.0005;
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        function handleCollision(index) {
+            const item = items[index];
+            if (item.type === 'correct') {
+                score += 100;
+                document.getElementById('question-display').style.borderColor = '#00ff00';
+                setTimeout(() => document.getElementById('question-display').style.borderColor = '#00ffcc', 200);
+            } else {
+                lives--;
+                document.getElementById('game-container').style.background = 'red';
+                setTimeout(() => document.getElementById('game-container').style.background = 'radial-gradient(circle, #1a1a2e 0%, #000000 100%)', 100);
+                if (lives <= 0) gameOver();
+            }
+            item.element.remove();
+            items.splice(index, 1);
+            updateHUD();
+            items.forEach(i => i.element.remove());
+            items = [];
+            if (lives > 0) setTimeout(nextQuestion, 500);
+        }
+
+        function updateHUD() {
+            document.getElementById('score').innerText = `SCORE: ${score}`;
+            let heartStr = "";
+            for(let i=0; i<lives; i++) heartStr += "❤️";
+            document.getElementById('lives').innerText = heartStr;
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            cancelAnimationFrame(animationId);
+            document.getElementById('game-over-screen').classList.remove('hidden');
+            document.getElementById('final-score').innerText = score;
+        }
+
+        function resetGame() {
+            document.getElementById('game-over-screen').classList.add('hidden');
+            items.forEach(i => i.element.remove());
+            items = [];
+            currentLane = 1;
+            const car = document.getElementById('player-car');
+            car.style.left = `calc(${lanes[currentLane]}% - 35px)`;
+            startGame();
+        }
+    </script>
+</body>
+</html>
